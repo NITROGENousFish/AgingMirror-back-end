@@ -6,6 +6,7 @@ mysql 8.0 as databases
 
 
 
+
 pip list in server:
 服务器的piplist如下：
 certifi                 2020.4.5.1
