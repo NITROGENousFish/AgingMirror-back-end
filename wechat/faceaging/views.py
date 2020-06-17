@@ -14,6 +14,7 @@ import os
 from .forms import UploadFileForm
 from .py_scripts import scripts_findlostpeople
 from rest_framework.decorators import api_view, authentication_classes
+from django.http import QueryDict
 
 def findlostpeople(request):
     if request.method == "POST":
@@ -67,13 +68,12 @@ def album(request):
         nickname = request.POST.get('nickname', '').encode()
         albumname = request.POST.get('albumname', '')
         visibility = True if request.POST.get('visibility', '')=="true" else False
-        createtime = request.POST.get('createtime', '')
-        if Album.objects.filter(albumname=albumname):
+        if Album.objects.filter(nickname=nickname,albumname=albumname):
             print("相册重复创建")
             response =  JsonResponse({'status': '相册重复创建'})
             response.status_code = 400
             return response
-        newAlbum = Album(nickname=nickname,albumname=albumname,visibility=visibility,createtime=createtime,totalsum=0)
+        newAlbum = Album(nickname=nickname,albumname=albumname,visibility=visibility,totalsum=0)
         newAlbum.save()
         print("上传相册信息完成，已经存储",Album.objects.all())
         return JsonResponse({'status':'success'})
@@ -103,7 +103,97 @@ def album(request):
                 "totalsum": item.totalsum
             })
         return JsonResponse(array_return,safe=False)
+    if request.method == "DELETE":
+        print("删除相册请求")
+        delete_content = QueryDict(request.body)
+        nickname = delete_content.get('nickname', '').encode()
+        albumname = delete_content.get('albumname', '')
+        obje = Album.objects.get(nickname=nickname,albumname=albumname)
+        obje.delete()
+        for item in AlbumDetail.objects.filter(nickname=nickname, albumname=albumname):
+            item.delete()
+        return JsonResponse({'status': 'success'})
 
 @authentication_classes([])
 def albumdetail(request):
-    pass
+    if request.method == 'GET':
+        nickname = request.GET.get('nickname', '').encode()
+        albumname = request.GET.get('albumname', '')
+
+        array_return = []   #要返回的数组
+        current_time = ""   #一条记录中的时间信息
+        current_saying = "" #一条记录中的文字信息
+        url_list = []       #一条记录中的图片URL集合
+        item_counter=0
+        for i, item in enumerate(AlbumDetail.objects.filter(nickname=nickname,albumname=albumname)):
+            if i==0:
+                current_time = item.createtime
+                djangocreatetime = item.djangocreatetime
+                current_saying = item.upload_content
+                url_list=[item.pic_data.url]
+                item_counter = 1
+            else:
+                if item.createtime == current_time:
+                    url_list.append(item.pic_data.url)
+                    item_counter +=1
+                else:
+                    array_return.append({
+                        "createtimeMonth": str(djangocreatetime)[5:7],
+                        "createtimeDay": str(djangocreatetime)[8:10],
+                        "createtimeTime": str(djangocreatetime)[11:19],
+                        "createtime": current_time,
+                        "upload_content": current_saying,
+                        "url_list": list(url_list),
+                        "item_counter":item_counter
+                    })
+                    current_time = item.createtime
+                    current_saying = item.upload_content
+                    url_list=[item.pic_data.url]
+                    item_counter = 1
+        array_return.append({
+            "createtimeMonth": str(djangocreatetime)[5:7],
+            "createtimeDay": str(djangocreatetime)[8:10],
+            "createtimeTime": str(djangocreatetime)[11:19],
+            "createtime":current_time,
+            "upload_content": current_saying,
+            "url_list": list(url_list),
+            "item_counter": item_counter
+        })
+        print(array_return)
+        return JsonResponse(array_return, safe=False)
+    if request.method == 'POST':  # 添加照片请求
+        print("request POST:", str(request.POST).encode("gbk", "ignore").decode("gbk"))
+        # print("request FILE:", request.FILES)  # official page 1301
+        # print("request FILE DETAIL:", request.FILES['albumdetail'])  # 传递过来的name参数中是什么就用什么来访问，这里测试的是file-name
+        pic_data = request.FILES['albumdetail']
+        nickname = request.POST.get('nickname', '').encode()
+        albumname = request.POST.get('albumname', '')
+        upload_content = request.POST.get('upload_content', '')
+        createtime = request.POST.get('createtime', '')
+        createtime = createtime[1:len(createtime)-1]    #处理小程序JSON.stringify来的一对引号
+        print(createtime)
+        newAlbumDetail = AlbumDetail(nickname=nickname,albumname=albumname,createtime=createtime,pic_data=pic_data,upload_content=upload_content)
+        newAlbumDetail.save()
+        # 相册图片数目+1
+        thisAlbum = Album.objects.get(nickname=nickname,albumname=albumname)
+        thisAlbum.totalsum += 1
+        thisAlbum.save()
+        print("上传图片请求响应完成：albumdetail——POST")
+        return JsonResponse({"status": True})
+    if request.method == 'DELETE':
+        print("删除记录请求")
+        delete_content = QueryDict(request.body)
+        nickname = delete_content.get('nickname', '').encode()
+        albumname = delete_content.get('albumname', '')
+        createtime = delete_content.get('createtime', '')
+
+        item = AlbumDetail.objects.filter(nickname=nickname,albumname=albumname,createtime=createtime)
+        _t = Album.objects.get(nickname=nickname, albumname=albumname)
+        _t.totalsum = _t.totalsum - len(item)
+        _t.save()
+
+        AlbumDetail.objects.filter(nickname=nickname, albumname=albumname, createtime=createtime).delete()
+        return JsonResponse({'status': 'success'})
+
+
+

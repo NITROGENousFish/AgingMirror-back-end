@@ -1,6 +1,6 @@
 import requests
-APPID="wx00e942ceb5bea90a"
-APPSECRET="d66b5afe89e0a9db378f98f3a4e65c06"
+APPID=""
+APPSECRET=""
 
 class OpenId:
     def __init__(self, jscode):
