@@ -1,0 +1,18 @@
+{% load staticfiles %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Show!</title>
+</head>
+
+<body>
+    <h1>Show!</h1>
+    <p>共检测到{{ num }}张人脸</p>
+    {% for img, result in results.items %}
+        <img src="{% static img %}">
+        <p>{{ result }}</p>
+    {% endfor %}
+{#    <img src="{% static "aWzy.jpg" %}"/>#}
+</body>
+</html>
