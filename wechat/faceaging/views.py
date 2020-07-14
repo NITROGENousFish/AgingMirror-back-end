@@ -13,8 +13,11 @@ import time
 import os
 from .forms import UploadFileForm
 from .py_scripts import scripts_findlostpeople
+from .py_scripts import tencent_faceaging
 from rest_framework.decorators import api_view, authentication_classes
 from django.http import QueryDict
+import base64
+
 
 def findlostpeople(request):
     if request.method == "POST":
@@ -35,6 +38,170 @@ def findlostpeople(request):
         if findpeople_api_return == "not find":
             return JsonResponse({"status":False,"datalist":""})
         return JsonResponse({"status":True,"datalist":findpeople_api_return})
+
+def crossagecomparation(request):
+    PIC_FOLDER = './faceaging/py_scripts/crossagecomparation/'
+    if request.method == "POST":
+        if 'pic' in request.POST:  # 说明是上传图片的请求,pic中如果是0就是1号图片，是1就是2号图
+            print("收到PIC")
+            PIC_ID = request.POST.get('pic', '')
+            nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+            serverUrl = PIC_ID+"_"+nickname+"_"+str(request.FILES['crossagecomparation'])
+            THIS_FILE_PATH = PIC_FOLDER + serverUrl
+            with open(THIS_FILE_PATH, 'wb+') as destination:
+                for chunk in request.FILES['crossagecomparation'].chunks():
+                    destination.write(chunk)
+            return JsonResponse({'serverUrl':serverUrl})
+        if 'image1path' in request.POST:  # 说明是开始处理的的请求
+            image0path = request.POST.get('image0path', '')
+            image1path = request.POST.get('image1path', '')
+            rate = tencent_faceaging.processFaceagingPicture(PIC_FOLDER+image0path,PIC_FOLDER+image1path)
+            image0path_base64_data = base64.b64encode(open(PIC_FOLDER+image0path, 'rb') .read()).decode()
+            image1path_base64_data = base64.b64encode(open(PIC_FOLDER+image1path, 'rb') .read()).decode()
+            os.remove(PIC_FOLDER+image0path)
+            os.remove(PIC_FOLDER + image1path)
+            return JsonResponse({
+                "rate":rate,
+                "url1":'data:image/png;base64,'+image0path_base64_data,
+                "url2":'data:image/png;base64,'+image1path_base64_data
+            })
+
+def styletransfer(request):
+    PIC_FOLDER = './faceaging/py_scripts/styletransfer/'
+    STYLETRANSFER_SERVER_URL = 'http://127.0.0.1:8001/show/'
+    if request.method == "POST":
+        if 'pic' in request.POST:  # 说明是上传图片的请求,pic中如果是0就是1号图片，是1就是2号图
+            print("收到PIC")
+            PIC_ID = request.POST.get('pic', '')
+            nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+            serverUrl = PIC_ID+"_"+nickname+"_"+str(request.FILES['styletransfer'])
+            THIS_FILE_PATH = PIC_FOLDER + serverUrl
+            with open(THIS_FILE_PATH, 'wb+') as destination:
+                for chunk in request.FILES['styletransfer'].chunks():
+                    destination.write(chunk)
+            return JsonResponse({'serverUrl':serverUrl})
+        if 'image1path' in request.POST:  # 说明是开始处理的的请求
+            image0path = request.POST.get('image0path', '')
+            image1path = request.POST.get('image1path', '')
+            nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+            print(PIC_FOLDER+image0path)
+            files = {
+                "content_img":(image0path,open(PIC_FOLDER+image0path,'rb'),'image/png',{}),
+                "style_img": (image1path, open(PIC_FOLDER + image1path, 'rb'), 'image/png', {}),
+            }
+
+            try:
+                res = requests.post(STYLETRANSFER_SERVER_URL,data={"id":nickname},files=files)
+                image0path_base64_data = res.text
+                return JsonResponse({
+                    "url":'data:image/png;base64,'+image0path_base64_data,
+                })
+            except:
+                response =  JsonResponse({'status': '风格迁移服务器未工作'})
+                response.status_code = 400
+                return response
+
+def agedetection(request):
+    STYLETRANSFER_SERVER_URL = 'http://127.0.0.1:8002/show/'
+    PIC_FOLDER = './faceaging/py_scripts/agedetection/'
+    if request.method == "POST":
+        if 'pic' in request.POST:  # 说明是上传图片的请求,pic中如果是0就是1号图片，是1就是2号图
+            print("收到PIC")
+            PIC_ID = request.POST.get('pic', '')
+            nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+            serverUrl = PIC_ID+"_"+nickname+"_"+str(request.FILES['agedetection'])
+            THIS_FILE_PATH = PIC_FOLDER + serverUrl
+            with open(THIS_FILE_PATH, 'wb+') as destination:
+                for chunk in request.FILES['agedetection'].chunks():
+                    destination.write(chunk)
+            return JsonResponse({'serverUrl':serverUrl})
+    if 'image1path' in request.POST:  # 说明是开始处理的的请求
+
+        image1path = request.POST.get('image1path', '')
+        nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+
+        files = {
+            "image": (image1path, open(PIC_FOLDER + image1path, 'rb'), 'image/png', {}),
+        }
+        res = requests.post(STYLETRANSFER_SERVER_URL, data={"id": nickname}, files=files)
+        # print(res.text)
+        return JsonResponse(res.text,safe=False)
+        # try:
+        #
+        #
+        #     return JsonResponse(res.text)
+        # except:
+        #     response = JsonResponse({'status': '颜龄检测服务器未工作'})
+        #     response.status_code = 400
+        #     return response
+
+def wrinkleadd(request):
+    STYLETRANSFER_SERVER_URL = 'http://127.0.0.1:8003/show/'
+    PIC_FOLDER = './faceaging/py_scripts/agedetection/'
+    if request.method == "POST":
+        if 'pic' in request.POST:  # 说明是上传图片的请求,pic中如果是0就是1号图片，是1就是2号图
+            print("收到PIC")
+            PIC_ID = request.POST.get('pic', '')
+            nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+            serverUrl = PIC_ID+"_"+nickname+"_"+str(request.FILES['wrinkleadd'])
+            THIS_FILE_PATH = PIC_FOLDER + serverUrl
+            with open(THIS_FILE_PATH, 'wb+') as destination:
+                for chunk in request.FILES['wrinkleadd'].chunks():
+                    destination.write(chunk)
+            return JsonResponse({'serverUrl':serverUrl})
+    if 'image1path' in request.POST:  # 说明是开始处理的的请求
+
+        image1path = request.POST.get('image1path', '')
+        nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+
+        files = {
+            "image": (image1path, open(PIC_FOLDER + image1path, 'rb'), 'image/png', {}),
+        }
+        res = requests.post(STYLETRANSFER_SERVER_URL, data={"id": nickname}, files=files)
+        # print(res.text)
+        return JsonResponse(res.text,safe=False)
+        # try:
+        #
+        #
+        #     return JsonResponse(res.text)
+        # except:
+        #     response = JsonResponse({'status': '颜龄检测服务器未工作'})
+        #     response.status_code = 400
+        #     return response
+
+def faceagingcaae(request):
+    STYLETRANSFER_SERVER_URL = 'http://127.0.0.1:8004/show/'
+    PIC_FOLDER = './faceaging/py_scripts/faceagingcaae/'
+    if request.method == "POST":
+        if 'pic' in request.POST:
+            print("收到PIC")
+            PIC_ID = request.POST.get('pic', '')
+            nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+            serverUrl = PIC_ID+"_"+nickname+"_"+str(request.FILES['faceagingcaae'])
+            THIS_FILE_PATH = PIC_FOLDER + serverUrl
+            with open(THIS_FILE_PATH, 'wb+') as destination:
+                for chunk in request.FILES['faceagingcaae'].chunks():
+                    destination.write(chunk)
+            return JsonResponse({'serverUrl':serverUrl})
+    if 'image1path' in request.POST:  # 说明是开始处理的的请求
+
+        image1path = request.POST.get('image1path', '')
+        nickname = request.POST.get('nickname', '').encode("gbk", "ignore").decode("gbk")
+
+        files = {
+            "image": (image1path, open(PIC_FOLDER + image1path, 'rb'), 'image/png', {}),
+        }
+        res = requests.post(STYLETRANSFER_SERVER_URL, data={"id": nickname}, files=files)
+        # print(res.text)
+        return JsonResponse(res.text,safe=False)
+        # try:
+        #
+        #
+        #     return JsonResponse(res.text)
+        # except:
+        #     response = JsonResponse({'status': '颜龄检测服务器未工作'})
+        #     response.status_code = 400
+        #     return response
 
 @authentication_classes([])  # 添加
 def onLogin(request):           #响应微信用户登录中wx.login中后来的request
@@ -94,7 +261,7 @@ def album(request):
 
         array_return = []
         for i,item in enumerate(Album.objects.filter(nickname=nickname)):
-            current_color = ['lightgray','lightgreen','lightblue']
+            current_color = ['#FF9900','#0099CC','#FF6666','#CCCCCC','#009933','#009999','#99CC00','#FF9900','#33CC99','#006699']
             array_return.append({
                 "albumname":item.albumname,
                 "visibility": item.visibility,
