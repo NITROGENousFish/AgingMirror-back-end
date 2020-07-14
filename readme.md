@@ -18,7 +18,7 @@
 
 算法服务器采用virtualenvwrapper-win将每一个算法封装为一个django服务，让微信小程序与其进行交互。
 
-![image](https://github.com/NITROGENousFish/AgingMirror-back-end/raw/master/structure.png)
+![image](https://wx2.sbimg.cn/2020/07/14/CKMfa.png)
 
 算法服务器虚拟环境指南(基本涵盖了如下内容)
 
